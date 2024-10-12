@@ -1,95 +1,46 @@
-const jwt=require("jsonwebtoken");
-const mongoose =require("mongoose");
-const bcrypt=require("bcryptjs");
-const userSchema =new mongoose.Schema({
-    name:{
-        type:String,
-        required:true
-    },
-    email:{
-        type:String,
-        required:true
-    },
-    phone:{
-        type:Number,
-        required:true
-    },
-    work:{
-        type:String,
-        required:true
-    },
-    password:{
-        type:String,
-        required:true
-    },
-    cpassword:{
-        type:String,
-        required:true
-    },
-    date:{
-        type:Date,
-        default:Date.now
-    },
-    messages:[
-        {  name:{
-            type:String,
-            required:true
-        },
-        email:{
-            type:String,
-            required:true
-        },
-        phone:{
-            type:Number,
-            required:true
-        },
-            message:{
-                type:String,
-                required:true
-            }
-        }
-    ],
-    tokens:[
-        {token:{
-        type:String,
-        required:true  
-    }
-}
-    ]
+const mongoose = require('mongoose');
+const moment = require('moment-timezone');
 
-})
+let userSchema = new mongoose.Schema({
+  username: { type: String, unique: true, },  // sparse allows multiple nulls
+  fullName: { type: String, default: null },                // Optional and null by default
+  otp: { type: String, default: null },                     // Optional and null by default
+  expires_in: { type: String }, // Store the expiration time of the OTP
+  email: { type: String, unique: true, sparse: true, default: null }, // Optional and null
+  mobile: { type: String, unique: true, sparse: true, default: null }, // Optional and null
+  tokens: [{
+    token: { type: String, default: null }                   // Optional and null by default
+  }],
+  gender: { type: String, enum: ['Male', 'Female', 'Other', null], default: null }, // Optional and null
+  age: { type: Number, min: 18, default: null },             // Optional and null by default
+  address: { type: String, default: null },                  // Optional and null by default
+  bloodGroup: { type: String, enum: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-', null], default: null }, // Optional and null
+  profession: { type: String, default: null },               // Optional and null by default
+  hasInsurance: { type: String, default: "false" },          // Optional but defaults to "false"
+  insuranceType: { type: String, default: "" },              // Optional and defaults to an empty string
+  insuranceCompany: { type: String, default: "" },           // Optional and defaults to an empty string
+  createdAt: { type: String, default: null },                // Optional and null by default
+  updatedAt: { type: String, default: null }                 // Optional and null by default
 
-userSchema.pre('save',async function(next){
-    if(this.isModified('password')){
-        this.password=await bcrypt.hash(this.password,12);
-        this.cpassword=await bcrypt.hash(this.cpassword,12);
-    }
-    next();
-    })
+});
 
-userSchema.methods.generateAuthToken =async function(){
-    try{
-let token=jwt.sign({_id:this._id},process.env.SECRET_KEY);
-this.tokens=this.tokens.concat({token})
-this.save();
-return token;
-    }catch(err){
-        console.log(err);
-    }
-}
+// Pre-save hook to set the correct timezone for createdAt and updatedAt as strings
+userSchema.pre('save', function (next) {
+  const now = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
 
-userSchema.methods.addingMessage=async function({name,email,phone,message}){
-    try{
-this.messages=this.messages.concat({name,email,phone,message});
-await this.save();
+  if (!this.createdAt) {
+    this.createdAt = now;
+  }
 
-return this.messages;
-    }catch(err){
-        console.log(err,"this error from message sending");
-    }
-}
-const User=mongoose.model('USER', userSchema);
+  this.updatedAt = now;
+  next();
+});
 
-module.exports=User;
+// Pre-update hook to ensure updatedAt is also set in the correct timezone on updates
+userSchema.pre('findOneAndUpdate', function (next) {
+  const now = moment().tz('Asia/Kolkata').format('YYYY-MM-DD HH:mm:ss');
+  this._update.updatedAt = now;
+  next();
+});
 
-
+module.exports = mongoose.model('User', userSchema);
